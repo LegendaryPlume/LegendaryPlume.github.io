@@ -7,120 +7,39 @@ on:
     - cron: "0 16 * * *"
     
 jobs:
-  build:
-    name: Generate blog
+  docs:
     runs-on: ubuntu-latest
-    if: ${{ github.event.repository.owner.id == github.event.sender.id || github.event_name == 'schedule' }}
-    permissions: write-all
-    
-    strategy: 
-     matrix:
-      node-version: [16.x]
-    
+
+    strategy:
+      matrix:
+        node-version: [16.x]
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: pnpm
-        uses: pnpm/action-setup@v2.2.2
+      - uses: actions/checkout@v2
         with:
-         version: 7.17.0
-
-      - name: nodejs
+          # fetch all commits to get last updated time or other git log info
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v2.2.2
+        with:
+          version: 7.17.0
+      - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
         with:
-         node-version: ${{matrix.node-version}}
-         cache: 'pnpm'
-         
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
       - run: pnpm i
-      
-      - name: build vuePress site
-        run : pnpm run build
-        
-      - name: deplay to github pages
-        uses : crazy-max/ghaction-github-pages@v3
-        with : 
-         target_branch : gh-pages 
-         build_dir : .vuepress/dist
-         
-      
 
+      # run build script
+      - name: Build VuePress site
+        run: pnpm run build
 
-
-
-
-
-        
-        
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v4
-        with: 
-         
-
-      - name: Get config.json
-        run: |
-          echo "====== check config.josn file ======"
-          cat config.json
-          echo "====== check config.josn end  ======"
-          sudo apt-get install jq
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.8
-
-      - name: Clone source code
-        run: |
-          GMEEK_VERSION=$(jq -r ".GMEEK_VERSION" config.json)
-          git clone https://github.com/Meekdai/Gmeek.git /opt/Gmeek;
-          cd /opt/Gmeek/
-          lastTag=$(git describe --tags `git rev-list --tags --max-count=1`)
-          if [ $GMEEK_VERSION == 'last' ]; then git checkout $lastTag; else git checkout $GMEEK_VERSION; fi;
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r /opt/Gmeek/requirements.txt
-
-      - name: Generate new html
-        run: |
-          cp -r ./* /opt/Gmeek/
-          cd /opt/Gmeek/
-          python Gmeek.py ${{ secrets.GITHUB_TOKEN }} ${{ github.repository }} --issue_number '${{ github.event.issue.number }}'
-          cp -a /opt/Gmeek/docs ${{ github.workspace }} 
-          cp -a /opt/Gmeek/backup ${{ github.workspace }} 
-          cp /opt/Gmeek/blogBase.json ${{ github.workspace }} 
-          
-      - name: update html
-        run: |
-          git config --local user.email "$(jq -r ".email" config.json)"
-          git config --local user.name "${{ github.repository_owner }}"
-          git add .
-          git commit -a -m '🎉auto update by Gmeek action' || echo "nothing to commit"
-          git push || echo "nothing to push"
-          sleep 3
-          
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'docs/.'
-          
-  deploy:
-    name: Deploy blog
-    runs-on: ubuntu-20.04
-    needs: build
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    concurrency:
-      group: "pages"
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        uses: crazy-max/ghaction-github-pages@v3
+        with:
+          # deploy to gh-pages branch
+          target_branch: gh-pages
+          # deploy the default output dir of VuePress
+          build_dir: .vuepress/dist
+        env:
+          # @see https://docs.github.com/en/actions/reference/authentication-in-a-workflow#about-the-github_token-secret
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
