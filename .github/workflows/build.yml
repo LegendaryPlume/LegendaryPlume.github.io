@@ -35,9 +35,14 @@ jobs:
       - run: pnpm i
       
       - name: build vuePress site
-        run:pnpm run build
+        run : pnpm run build
         
-
+      - name: deplay to github pages
+        uses : crazy-max/ghaction-github-pages@v3
+        with : 
+         target_branch : gh-pages 
+         build_dir : .vuepress/dist
+         
       
 
 
